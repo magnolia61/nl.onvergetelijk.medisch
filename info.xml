@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<extension key="nl.onvergetelijk.medisch" type="module">
+  <file>medisch</file>
+  <name>nl.onvergetelijk.medisch</name>
+  <description>Extensie tbv gegevens medische en dieet</description>
+  <license>AGPL-3.0</license>
+  <maintainer>
+    <author>magnolia61</author>
+    <email>webteam@onvergetelijk.nl</email>
+  </maintainer>
+  <urls>
+    <url desc="Main Extension Page">https://www.onvergetelijk.nl</url>
+    <url desc="Documentation">https://www.onvergetelijk.nl</url>
+    <url desc="Support">https://www.onvergetelijk.nl</url>
+    <url desc="Licensing">http://www.gnu.org/licenses/agpl-3.0.html</url>
+  </urls>
+  <releaseDate>2024-12-20</releaseDate>
+  <version>1.0</version>
+  <develStage>alpha</develStage>
+  <compatibility>
+    <ver>5.80</ver>
+  </compatibility>
+  <comments>This module is an extension for Stichting Onvergetelijke Zomerkampen</comments>
+  <classloader>
+    <psr0 prefix="CRM_" path="."/>
+    <psr4 prefix="Civi\" path="Civi"/>
+  </classloader>
+  <civix>
+    <namespace>CRM/medisch</namespace>
+    <format>23.02.1</format>
+    <angularModule>crmmedisch</angularModule>
+  </civix>
+  <mixins>
+    <mixin>mgd-php@1.0.0</mixin>
+    <mixin>setting-php@1.0.0</mixin>
+    <mixin>smarty-v2@1.0.1</mixin>
+  </mixins>
+</extension>

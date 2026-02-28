@@ -1,0 +1,450 @@
+<?php
+
+require_once 'medisch.civix.php';
+
+use CRM_Intake_ExtensionUtil as E;
+
+function medisch_civicrm_customPre(string $op, int $groupID, int $entityID, array &$params): void {
+
+    $extdebug   = 3;  //  1 = basic // 2 = verbose // 3 = params / 4 = results
+    $apidebug   = FALSE;
+
+    if ($op != 'create' && $op != 'edit') { //    did we just create or edit a custom object?
+        wachthond($extdebug,4, "########################################################################");
+        wachthond($extdebug,4, "### MEDISCH [PRE] EXIT: op != create OR op != edit", "(op: $op)");
+        wachthond($extdebug,4, "########################################################################");
+        return; //  if not, get out of here
+    }
+
+    $extwrite               = 1;
+    $extmedisch             = 1;
+
+    $today_datetime         = date("Y-m-d H:i:s");
+    $today_datetime_past    = date('Y-m-d H:i:s', strtotime('-99 year', strtotime($today_datetime)) );
+    wachthond($extdebug,4, 'today_datetime_past',       $today_datetime_past);
+
+    $profilecontmedisch     = array(148);
+
+    if (in_array($groupID, $profilecontmedisch))  {
+
+        $contact_id = $entityID;
+
+        wachthond($extdebug,1, "########################################################################");
+        wachthond($extdebug,1, "### MEDISCH [PRE] START PROFILE VOOR $entityID", "[groupID: $groupID / op: $op]");
+        wachthond($extdebug,4, "########################################################################");
+
+    } else {
+        wachthond($extdebug,4, "########################################################################");
+        wachthond($extdebug,4, "### MEDISCH [PRE] EXIT: groupID ($groupID) not in allowed list (profileMEDISCH)", $profileMEDISCH);
+        wachthond($extdebug,4, "########################################################################");
+        return; //  if not, get out of here
+    }
+
+    if (in_array($groupID, $profilecontmedisch)) {
+
+        wachthond($extdebug,2, "########################################################################");
+        wachthond($extdebug,2, "### MEDISCH [PRE] 1.1 START RETRIEVE VALUES FROM PARAMS", "[groupID: $groupID / op: $op]");
+        wachthond($extdebug,2, "########################################################################");
+
+        wachthond($extdebug,4, "entityid",    $entityID);
+        wachthond($extdebug,4, "params",      $params);
+
+        foreach($params as $i=>$item) {
+
+            if ( !isset($indexed[$i][$item['id']]) ) {
+                $indexed[$i]['key']         = $i;
+                $indexed[$i]['entity_id']   = $item['entity_id']    ?? NULL;
+                $indexed[$i]['column_name'] = $item['column_name']  ?? NULL;
+//              $indexed[$i]['table_name']  = $item['table_name']   ?? NULL;
+                $indexed[$i]['value']       = $item['value']        ?? NULL;
+            }
+
+            // M61: URGENT TODO: DIT FAALT NU INDIEN EEN VELD LEEG WORD GEMAAKT
+
+            if (!isset($key_medische_issues[$i])      AND $item['column_name']=="medisch_issues_1832"     ) { $all_medische_issues[]      = $i;   }
+            if (!isset($key_medisch_toelichting[$i])  AND $item['column_name']=="medisch_toelichting_1833") { $all_medisch_toelichting[]  = $i;   }
+            if (!isset($key_medisch_medicatie[$i])    AND $item['column_name']=="medisch_medicatie_1834"  ) { $all_medisch_medicatie[]    = $i;   }
+            if (!isset($key_medisch_longlist[$i])     AND $item['column_name']=="medisch_longlist_2057"   ) { $all_medisch_longlist[]    = $i;   }
+            if (!isset($key_dieet_issues[$i])         AND $item['column_name']=="dieet_issues_1838"       ) { $all_dieet_issues[]         = $i;   }
+            if (!isset($key_dieet_shortlist[$i])      AND $item['column_name']=="dieet_shortlist_1839"    ) { $all_dieet_shortlist[]      = $i;   }
+            if (!isset($key_dieet_toelichting[$i])    AND $item['column_name']=="dieet_toelichting_1840"  ) { $all_dieet_toelichting[]    = $i;   }
+            if (!isset($key_medisch_modified[$i])     AND $item['column_name']=="medisch_modified_2101"   ) { $all_medisch_modified[]     = $i;   }
+
+        }
+
+        wachthond($extdebug,2, "indexed", $indexed);
+
+        $key_medische_issues        = $all_medische_issues[0];
+        $key_medisch_toelichting    = $all_medisch_toelichting[0];
+        $key_medisch_medicatie      = $all_medisch_medicatie[0];
+        $key_medisch_longlist       = $all_medisch_longlist[0];
+        $key_dieet_issues           = $all_dieet_issues[0];
+        $key_dieet_shortlist        = $all_dieet_shortlist[0];
+        $key_dieet_toelichting      = $all_dieet_toelichting[0];
+        $key_medisch_modified       = $all_medisch_modified[0];
+
+        wachthond($extdebug,3,  "key_medische_issues",          $key_medische_issues);
+        wachthond($extdebug,3,  "key_medisch_toelichting",      $key_medisch_toelichting);
+        wachthond($extdebug,3,  "key_medisch_medicatie",        $key_medisch_medicatie);
+        wachthond($extdebug,3,  "key_medisch_longlist",         $key_medisch_longlist);
+        wachthond($extdebug,3,  "key_dieet_issues",             $key_dieet_issues);
+        wachthond($extdebug,3,  "key_dieet_shortlist",          $key_dieet_shortlist);
+        wachthond($extdebug,3,  "key_dieet_toelichting",        $key_dieet_toelichting);
+        wachthond($extdebug,3,  "key_medisch_modified",         $key_medisch_modified);
+
+        ##########################################################################################
+        ### GET MEDISCHE ISSUES
+        ##########################################################################################        
+
+        if ($key_medische_issues >= 0) {
+            $raw_medische_issues           = $params[$key_medische_issues]['value']       ?? NULL;
+            $val_medische_issues           = array_filter(explode('', $raw_medische_issues));
+            wachthond($extdebug,2,          "val_medische_issues",     $val_medische_issues[0]);
+        }
+
+        ##########################################################################################
+        ### GET MEDISCH TOELICHTING
+        ##########################################################################################        
+
+        if ($key_medisch_toelichting >= 0) {
+            $raw_medisch_toelichting        = $params[$key_medisch_toelichting]['value']    ?? NULL;
+            $val_medisch_toelichting        = $raw_medisch_toelichting;
+            wachthond($extdebug,2,          "val_medisch_toelichting",  $val_medisch_toelichting);
+        }
+
+        ##########################################################################################
+        ### GET MEDISCH MEDICATIE
+        ##########################################################################################        
+
+        if ($key_medisch_medicatie >= 0) {
+            $raw_medisch_medicatie          = $params[$key_medisch_medicatie]['value']      ?? NULL;
+            $val_medisch_medicatie          = $raw_medisch_medicatie; 
+            wachthond($extdebug,2,          "val_medisch_medicatie",    $val_medisch_medicatie);
+        }
+
+        ##########################################################################################
+        ### GET MEDISCH LONGLIST
+        ##########################################################################################        
+
+        if ($key_medisch_longlist >= 0) {
+            $raw_medisch_longlist            = $params[$key_medisch_longlist]['value']        ?? NULL;
+            $val_medisch_longlist            = array_filter(explode('', $raw_medisch_longlist));
+            $cnt_medisch_longlist            = sizeof($val_medisch_longlist);
+            wachthond($extdebug,2,          "raw_medisch_longlist",      $raw_medisch_longlist);
+            wachthond($extdebug,2,          "val_medisch_longlist",      $val_medisch_longlist);
+            wachthond($extdebug,2,          "cnt_medisch_longlist",      $cnt_medisch_longlist);
+        }
+
+        ##########################################################################################
+        ### GET DIEET ISSUES
+        ##########################################################################################        
+
+        if ($key_dieet_issues >= 0) {
+            $raw_dieet_issues               = $params[$key_dieet_issues]['value']          ?? NULL;
+            $val_dieet_issues               = array_filter(explode('', $raw_dieet_issues));
+            wachthond($extdebug,2, "val_dieet_issues",      $val_dieet_issues[0]);
+        }
+
+        ##########################################################################################
+        ### GET DIEET SHORTLIST
+        ##########################################################################################        
+
+        if ($key_dieet_shortlist >= 0) {
+            $raw_dieet_shortlist            = $params[$key_dieet_shortlist]['value']        ?? NULL;
+            $val_dieet_shortlist            = array_filter(explode('', $raw_dieet_shortlist));
+            $cnt_dieet_shortlist            = sizeof($val_dieet_shortlist);
+            wachthond($extdebug,2,          "raw_dieet_shortlist",      $raw_dieet_shortlist);
+            wachthond($extdebug,2,          "val_dieet_shortlist",      $val_dieet_shortlist);
+            wachthond($extdebug,2,          "cnt_dieet_shortlist",      $cnt_dieet_shortlist);
+        }
+
+        ##########################################################################################
+        ### GET DIEET TOELICHTING
+        ##########################################################################################        
+
+        if ($key_dieet_toelichting >= 0) {
+            $raw_dieet_toelichting          = $params[$key_dieet_toelichting]['value']      ?? NULL;
+            $val_dieet_toelichting          = $raw_dieet_toelichting;  
+            wachthond($extdebug,2,          "val_dieet_toelichting",    $val_dieet_toelichting[0]);
+        }
+
+        ##########################################################################################
+        ### GET DATUM MEDISCH MODIFIED
+        ##########################################################################################        
+
+        if ($key_medisch_modified >= 0) {
+            $raw_medisch_modified           = $params[$key_medisch_modified]['value']       ?? NULL;
+            $val_medisch_modified           = date("Y-m-d H:i:s", strtotime($raw_medisch_modified)); 
+            wachthond($extdebug,2,          "val_medisch_modified",     $val_medisch_modified);
+        }             
+
+        wachthond($extdebug,2, "########################################################################");
+        wachthond($extdebug,2, "### MEDISCH [PRE] 2.1 CHECKBOX MEDISCH INDIEN MEDICATIE OF TOELICHTING");
+        wachthond($extdebug,2, "########################################################################");
+
+        if (is_numeric($key_medisch_issues)) {
+
+            wachthond($extdebug,2, 'key_medisch_issues',                    $key_medisch_issues);
+            wachthond($extdebug,2, 'val_medisch_medicatie',                 $val_medisch_medicatie);
+            wachthond($extdebug,2, 'val_medisch_toelichting',               $val_medisch_toelichting);
+
+            if (!empty($val_medisch_medicatie) OR !empty($val_medisch_toelichting)) {
+                $new_medisch_issues = 1;
+            } else {
+                $new_medisch_issues = 0;
+            }
+
+            wachthond($extdebug,3, 'OLD params[key_medisch_issues]',        $params[$key_medisch_issues]);                    
+            $params[$key_medisch_issues]['value'] =                         $new_medisch_issues;
+            wachthond($extdebug,3, 'NEW params[key_medisch_issues]',        $params[$key_medisch_issues]);
+
+            wachthond($extdebug,1,  "VINK BIJ ISSUES medisch BIJ SHORTLIST/TOELICHTING/LONGLIST", $new_medisch_issues);
+        }
+
+        wachthond($extdebug,2, "########################################################################");
+        wachthond($extdebug,2, "### MEDISCH [PRE] 2.2 CHECKBOX DIEET INDIEN SHORTLIST OF TOELICHTING");
+        wachthond($extdebug,2, "########################################################################");
+
+        if (is_numeric($key_dieet_issues)) {
+
+            wachthond($extdebug,2, 'key_dieet_issues',                      $key_dieet_issues);
+            wachthond($extdebug,2, 'val_dieet_issues',                      $val_dieet_issues);
+            wachthond($extdebug,2, 'val_dieet_shortlist',                   $val_dieet_shortlist);
+            wachthond($extdebug,2, 'val_dieet_toelichting',                 $val_dieet_toelichting);
+
+            if (!empty($val_dieet_shortlist) OR !empty($val_dieet_toelichting)) {
+                $new_dieet_issues = 1;
+            } else {
+                $new_dieet_issues = 0;
+            }
+
+            wachthond($extdebug,3, 'OLD params[key_dieet_issues]',          $params[$key_dieet_issues]);                    
+            $params[$key_dieet_issues]['value'] =                           $new_dieet_issues;
+            wachthond($extdebug,3, 'NEW params[key_dieet_issues]',          $params[$key_dieet_issues]);
+
+            wachthond($extdebug,1,  "VINK BIJ ISSUES DIEET BIJ SHORTLIST/TOELICHTING/LONGLIST", $new_dieet_issues);
+        }
+
+        wachthond($extdebug,2, "########################################################################");
+        wachthond($extdebug,2, "### MEDISCH [PRE] 3.1 VINK (DOUBLE) CHECK AAN BIJ WAARDE",     "[EPIPEN]");
+        wachthond($extdebug,2, "########################################################################");
+
+        if (is_array($val_medisch_longlist)) {
+
+            wachthond($extdebug,3,  "val_medisch_longlist",                             $val_medisch_longlist);
+
+            $new_medisch_longlist   = $val_medisch_longlist;
+            $value                      = 'epipen';
+            $needles_epipen             = [' epipen ', ' epipen.', ' epi pen ', ' epi pen.', 'epi-pen'];
+
+            $match_found_toelichting    = str_contains_any($val_medisch_toelichting,    $needles_epipen, false);
+            wachthond($extdebug,4, 'match_found_toelichting',                           $match_found_toelichting);
+            $match_found_medicatie      = str_contains_any($val_medisch_medicatie,      $needles_epipen, false);
+            wachthond($extdebug,4, 'match_found_medicatie',                             $match_found_medicatie);
+            $match_found_notities       = str_contains_any($val_medisch_notities,       $needles_epipen, false);
+            wachthond($extdebug,4, 'match_found_notities',                              $match_found_notities);
+
+            if ($match_found_toelichting == TRUE OR $match_found_medicatie == TRUE OR $match_found_notities == TRUE) {
+
+                array_push($new_medisch_longlist, $value);
+                wachthond($extdebug,3,  "new_medisch_longlist (toegevoegd: $value)",    $new_medisch_longlist);
+                $new_medisch_longlist   = array_unique($new_medisch_longlist);
+                wachthond($extdebug,3,  "new_medisch_longlist (arrayunique)",           $new_medisch_longlist);
+                $new_medisch_longlist   = implode('',          $new_medisch_longlist);
+                wachthond($extdebug,1,  "VINKJE BIJ LONGLIST MEDISCH VOOR $value",       "[$new_medisch_longlist]");
+
+            } else {
+
+                wachthond($extdebug,4,  "new_medisch_longlist",                         $new_medisch_longlist);
+                $findKey = array_search($value, $new_medisch_longlist);
+                unset($new_medisch_longlist[$findKey]);
+                wachthond($extdebug,1,  "VINKJE UIT LONGLIST MEDISCH VOOR $value",      $new_medisch_longlist);
+            }
+        }
+
+        wachthond($extdebug,2, "########################################################################");
+        wachthond($extdebug,2, "### MEDISCH [PRE] 3.2 VINK (DOUBLE) CHECK AAN BIJ WAARDE", "[ANAFYLAXIE]");
+        wachthond($extdebug,2, "########################################################################");
+
+        wachthond($extdebug,3,  "new_medisch_longlist",                                 $new_medisch_longlist);
+
+        if ($new_medisch_longlist) {
+            $val_medisch_longlist       = $new_medisch_longlist;
+            wachthond($extdebug,1,  "CONTINUE WITH NEW_MEDISCH_LONGLIST",               $new_medisch_longlist);
+        } else {
+            $new_medisch_longlist       = $val_medisch_longlist;
+            wachthond($extdebug,1,  "START WITH NEW_MEDISCH_LONGLIST",                  $new_medisch_longlist);
+        }
+
+        if (is_array($val_medisch_longlist)) {
+
+            $value                      = 'anafylaxie';
+            $needles_anafylaxie         = ['anafylaxie', 'anafylactische'];
+
+            $match_found_toelichting    = str_contains_any($val_medisch_toelichting,    $needles_anafylaxie, false);
+            wachthond($extdebug,4, 'match_found_toelichting',                           $match_found_toelichting);
+            $match_found_medicatie      = str_contains_any($val_medisch_medicatie,      $needles_anafylaxie, false);
+            wachthond($extdebug,4, 'match_found_medicatie',                             $match_found_medicatie);
+            $match_found_notities       = str_contains_any($val_medisch_notities,       $needles_anafylaxie, false);
+            wachthond($extdebug,4, 'match_found_notities',                              $match_found_notities);
+
+            if ($match_found_toelichting == TRUE OR $match_found_medicatie == TRUE OR $match_found_notities == TRUE) {
+
+                array_push($new_medisch_longlist, $value);
+                wachthond($extdebug,3,  "new_medisch_longlist (toegevoegd: $value)",    $new_medisch_longlist);
+                $new_medisch_longlist   = array_unique($new_medisch_longlist);
+                wachthond($extdebug,3,  "new_medisch_longlist (arrayunique)",           $new_medisch_longlist);        
+                $new_medisch_longlist   = implode('',                             $new_medisch_longlist);
+                wachthond($extdebug,1,  "VINKJE BIJ LONGLIST MEDISCH VOOR $value",      $new_medisch_longlist);
+
+            } else {
+
+                wachthond($extdebug,4,  "new_medisch_longlist",                         $new_medisch_longlist);
+                $findKey = array_search($value, $new_medisch_longlist);
+                unset($new_medisch_longlist[$findKey]);
+                wachthond($extdebug,1,  "VINKJE UIT LONGLIST MEDISCH VOOR $value",      $new_medisch_longlist);
+            }
+        }        
+
+        wachthond($extdebug,2, "########################################################################");
+        wachthond($extdebug,2, "### MEDISCH [PRE] 3.3 VINK (DOUBLE) CHECK AAN BIJ WAARDE","[HARTKLACHTEN]");
+        wachthond($extdebug,2, "########################################################################");
+
+        wachthond($extdebug,4,  "new_medisch_longlist",                                 $new_medisch_longlist);
+
+        if (is_array($new_medisch_longlist)) {
+            $val_medisch_longlist       = $new_medisch_longlist;
+            wachthond($extdebug,1,  "CONTINUE WITH NEW_MEDISCH_LONGLIST",               $new_medisch_longlist);
+        } else {
+            $new_medisch_longlist       = $val_medisch_longlist;
+            wachthond($extdebug,1,  "START WITH NEW_MEDISCH_LONGLIST",                  $new_medisch_longlist);
+        }
+
+        if (is_array($val_medisch_longlist)) {
+
+            $value                      = 'hartklachten';
+            $needles_hartklachten       = [' hartklachten', 'hartritme', ' hartaanval'];
+
+            $match_found_toelichting    = str_contains_any($val_medisch_toelichting,    $needles_hartklachten, false);
+            wachthond($extdebug,4, 'match_found_toelichting',                           $match_found_toelichting);
+            $match_found_medicatie      = str_contains_any($val_medisch_medicatie,      $needles_hartklachten, false);
+            wachthond($extdebug,4, 'match_found_medicatie',                             $match_found_medicatie);
+            $match_found_notities       = str_contains_any($val_medisch_notities,       $needles_hartklachten, false);
+            wachthond($extdebug,4, 'match_found_notities',                              $match_found_notities);
+
+            if ($match_found_toelichting == TRUE OR $match_found_medicatie == TRUE OR $match_found_notities == TRUE) {
+
+                array_push($new_medisch_longlist, $value);
+                wachthond($extdebug,3,  "new_medisch_longlist (toegevoegd: $value)",    $new_medisch_longlist);
+                $new_medisch_longlist   = array_unique($new_medisch_longlist);
+                wachthond($extdebug,3,  "new_medisch_longlist (arrayunique)",           $new_medisch_longlist);        
+                $new_medisch_longlist   = implode('',                             $new_medisch_longlist);
+                wachthond($extdebug,1,  "VINKJE BIJ LONGLIST MEDISCH VOOR $value",      $new_medisch_longlist);
+
+            } else {
+
+                wachthond($extdebug,4,  "new_medisch_longlist",                         $new_medisch_longlist);
+                $findKey = array_search($value, $new_medisch_longlist);
+                unset($new_medisch_longlist[$findKey]);
+                wachthond($extdebug,1,  "VINKJE UIT LONGLIST MEDISCH VOOR $value",      $new_medisch_longlist);
+            }
+        }        
+
+        wachthond($extdebug,2, "########################################################################");
+        wachthond($extdebug,2, "### MEDISCH [PRE] 3.4 VINK (DOUBLE) CHECK AAN BIJ WAARDE", "[MOBILITEIT]");
+        wachthond($extdebug,2, "########################################################################");
+
+        wachthond($extdebug,4,  "new_medisch_longlist",                                 $new_medisch_longlist);
+
+        if (is_array($new_medisch_longlist)) {
+            $val_medisch_longlist       = $new_medisch_longlist;
+            wachthond($extdebug,1,  "CONTINUE WITH NEW_MEDISCH_LONGLIST",               $new_medisch_longlist);
+        } else {
+            $new_medisch_longlist       = $val_medisch_longlist;
+            wachthond($extdebug,1,  "START WITH NEW_MEDISCH_LONGLIST",                  $new_medisch_longlist);
+        }
+
+        if (is_array($val_medisch_longlist)) {
+
+            $value                      = 'mobiliteit';
+            $needles_mobiliteit       = ['mobiliteit', ' krukken', 'rolstoel'];
+
+            $match_found_toelichting    = str_contains_any($val_medisch_toelichting,    $needles_mobiliteit,    false);
+            wachthond($extdebug,3, 'match_found_toelichting',                           $match_found_toelichting);
+            $match_found_medicatie      = str_contains_any($val_medisch_medicatie,      $needles_mobiliteit,    false);
+            wachthond($extdebug,3, 'match_found_medicatie',                             $match_found_medicatie);
+            $match_found_notities       = str_contains_any($val_medisch_notities,       $needles_mobiliteit,    false);
+            wachthond($extdebug,3, 'match_found_notities',                              $match_found_notities);
+
+            if ($match_found_toelichting == TRUE OR $match_found_medicatie == TRUE OR $match_found_notities == TRUE) {
+
+                array_push($new_medisch_longlist, $value);
+                wachthond($extdebug,3,  "new_medisch_longlist (toegevoegd: $value)",    $new_medisch_longlist);
+                $new_medisch_longlist   = array_unique($new_medisch_longlist);
+                wachthond($extdebug,3,  "new_medisch_longlist (arrayunique)",           $new_medisch_longlist);        
+                $new_medisch_longlist   = implode('',                             $new_medisch_longlist);
+                wachthond($extdebug,1,  "VINKJE BIJ LONGLIST MEDISCH VOOR $value",      $new_medisch_longlist);
+
+            } else {
+
+                wachthond($extdebug,4,  "new_medisch_longlist",                         $new_medisch_longlist);
+                $findKey = array_search($value, $new_medisch_longlist);
+                unset($new_medisch_longlist[$findKey]);
+                wachthond($extdebug,1,  "VINKJE UIT LONGLIST MEDISCH VOOR $value",      $new_medisch_longlist);
+            }
+        } 
+
+        wachthond($extdebug,2, "########################################################################");
+        wachthond($extdebug,2, "### MEDISCH [PRE] 3.9 SCHRIJF WAARDE NAAR DB",       "[MEDISCH LONGLIST]");
+        wachthond($extdebug,2, "########################################################################");
+
+        if (is_numeric($key_medisch_longlist) AND $new_medisch_longlist) {
+
+            wachthond($extdebug,3, 'OLD params[key_medisch_longlist]',      $params[$key_medisch_longlist]);
+            $params[$key_medisch_longlist]['value'] =                       $new_medisch_longlist;
+            wachthond($extdebug,3, 'NEW params[key_medisch_longlist]',      $params[$key_medisch_longlist]);
+        } else {
+            wachthond($extdebug,2,  "key_medisch_longlist",                         $key_medisch_longlist);
+            wachthond($extdebug,2,  "new_medisch_longlist",                         $new_medisch_longlist);
+        }
+
+        wachthond($extdebug,2, "########################################################################");
+        wachthond($extdebug,2, "### MEDISCH [PRE] 7.0 UPDATE DATUM MEDISCH MODIFIED");
+        wachthond($extdebug,2, "########################################################################");
+
+        wachthond($extdebug,2, 'key_medisch_modified',                      $key_medisch_modified);
+
+        $today_datetime_db  = date("YmdHis");
+        wachthond($extdebug,2, 'today_datetime',                            $today_datetime);
+        wachthond($extdebug,2, 'today_datetime_db',                         $today_datetime_db);
+
+        if (is_numeric($key_medisch_modified) AND !empty($today_datetime_db)) {
+
+            wachthond($extdebug,3, 'OLD params[key_dieet_modified]',        $params[$key_medisch_modified]);
+            $params[$key_medisch_modified]['value'] =                       $today_datetime_db;
+            wachthond($extdebug,3, 'NEW params[key_dieet_modified]',        $params[$key_medisch_modified]);
+        }
+
+        wachthond($extdebug,4, "NEW params",                $params);
+
+        wachthond($extdebug,1, "########################################################################");
+        wachthond($extdebug,1, "### MEDISCH [PRE] EINDE PROFILE VOOR $entityID", "[groupID: $groupID / op: $op]");
+        wachthond($extdebug,1, "########################################################################");
+
+
+    }
+
+}
+
+function str_contains_any($haystack, $needles, $case_sensitive)
+{
+    foreach ($needles as $needle)
+    {
+        if (str_contains($haystack, $needle) || (($case_sensitive === false) && str_contains(strtolower($haystack), strtolower($needle))))
+        {
+            return true;
+        }
+    }
+    
+    return false;
+}
